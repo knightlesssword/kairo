@@ -1,0 +1,30 @@
+# env / secrets
+.env
+.env.local
+*.key
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# node / next
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-error.log*
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# data
+postgres-data/
