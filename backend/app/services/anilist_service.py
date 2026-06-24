@@ -59,6 +59,11 @@ async def _query(token: str, query: str, variables: dict | None = None) -> dict:
     if resp.status_code == 401:
         raise AniListAuthError("AniList returned 401")
     if resp.status_code != 200:
+        import logging as _logging
+        _logging.getLogger(__name__).debug(
+            "AniList %d | query: %s | body: %s",
+            resp.status_code, query[:300], resp.text[:300],
+        )
         raise AniListError(f"AniList returned {resp.status_code}")
 
     body = resp.json()
@@ -275,8 +280,7 @@ class AnimeSearchResult(BaseModel):
         }
 
 
-_MEDIA_FIELDS = """id title { romaji english } genres episodes averageScore
-    status description(asHtml: false) format season seasonYear"""
+_MEDIA_FIELDS = "id title { romaji english } genres episodes averageScore status description(asHtml: false) format season seasonYear"
 
 _SEASON_QUERY = """
 query ($season: MediaSeason, $seasonYear: Int) {
