@@ -12,6 +12,7 @@ from app.models.db.profile import (  # noqa: F401
     TasteProfile,
     UserAnimeList,
 )
+from app.models.db.conversation import Conversation, Message  # noqa: F401
 
 __all__: list[str] = [
     "User",
@@ -20,4 +21,6 @@ __all__: list[str] = [
     "UserAnimeList",
     "TasteProfile",
     "SyncJob",
+    "Conversation",
+    "Message",
 ]

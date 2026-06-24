@@ -11,6 +11,7 @@ rather than causing parse failures when AniList adds new fields.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
 import httpx
@@ -233,3 +234,108 @@ async def fetch_viewer_stats(token: str) -> AnilistStats:
     if not viewer:
         raise AniListError("Viewer field missing in stats response")
     return AnilistStats.model_validate(viewer)
+
+
+# ---------------------------------------------------------------------------
+# chat-service lookups (bounded: <=1 query each, called at most once per message)
+# ---------------------------------------------------------------------------
+
+class AnimeSearchResult(BaseModel):
+    """metadata for one anime from a title search or season query."""
+    model_config = ConfigDict(extra="ignore")
+    id: int
+    title: _MediaTitle | None = None
+    genres: list[str] = []
+    episodes: int | None = None
+    averageScore: int | None = None
+
+    @property
+    def display_title(self) -> str:
+        if self.title:
+            return self.title.english or self.title.romaji or "Unknown"
+        return "Unknown"
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "title": self.display_title,
+            "genres": self.genres,
+            "episodes": self.episodes,
+            "average_score": self.averageScore,
+        }
+
+
+_MEDIA_FIELDS = "id title { romaji english } genres episodes averageScore"
+
+_SEASON_QUERY = """
+query ($season: MediaSeason, $seasonYear: Int) {
+  Page(perPage: 20) {
+    media(season: $season, seasonYear: $seasonYear, type: ANIME,
+          sort: POPULARITY_DESC, status: RELEASING) {
+      %s
+    }
+  }
+}
+""" % _MEDIA_FIELDS
+
+
+def _current_season_vars() -> dict:
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    month = now.month
+    year = now.year
+    if month in (1, 2, 3):
+        season = "WINTER"
+    elif month in (4, 5, 6):
+        season = "SPRING"
+    elif month in (7, 8, 9):
+        season = "SUMMER"
+    else:
+        season = "FALL"
+    return {"season": season, "seasonYear": year}
+
+
+async def search_anime(token: str, titles: list[str]) -> list[AnimeSearchResult]:
+    """batch title search in one GraphQL query using field aliases.
+
+    capped at 5 titles to keep query size reasonable. returns found results only
+    (unmatched aliases are absent from the response, not an error).
+    """
+    if not titles:
+        return []
+
+    # cap at 5 to stay within reasonable query size
+    capped = titles[:5]
+
+    # build aliased query: t0: Media(search: "...", type: ANIME) { fields }
+    alias_blocks = "\n".join(
+        f't{i}: Media(search: {json.dumps(t)}, type: ANIME) {{ {_MEDIA_FIELDS} }}'
+        for i, t in enumerate(capped)
+    )
+    query = f"query {{\n{alias_blocks}\n}}"
+
+    data = await _query(token, query)
+
+    results: list[AnimeSearchResult] = []
+    for i in range(len(capped)):
+        raw = data.get(f"t{i}")
+        if raw:
+            try:
+                results.append(AnimeSearchResult.model_validate(raw))
+            except Exception:
+                continue
+    return results
+
+
+async def fetch_current_season(token: str) -> list[AnimeSearchResult]:
+    """fetch top 20 currently airing anime for the current season."""
+    vars_ = _current_season_vars()
+    data = await _query(token, _SEASON_QUERY, vars_)
+    raw_list = (data.get("Page") or {}).get("media") or []
+    results: list[AnimeSearchResult] = []
+    for raw in raw_list:
+        try:
+            results.append(AnimeSearchResult.model_validate(raw))
+        except Exception:
+            continue
+    return results

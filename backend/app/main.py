@@ -16,7 +16,7 @@ from starlette.requests import Request
 
 from app.config import get_settings
 from app.database import SessionFactory, dispose_engine
-from app.routers import auth, profile
+from app.routers import auth, conversations, profile
 from app.services import sync_service
 
 logging.basicConfig(
@@ -73,6 +73,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(profile.router)
+    app.include_router(conversations.router)
 
     return app
 

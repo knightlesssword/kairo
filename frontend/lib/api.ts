@@ -53,3 +53,73 @@ export async function getSyncJob(jobId: string): Promise<SyncJob> {
   if (!res.ok) throw new Error(`/profile/sync/${jobId} failed: ${res.status}`);
   return (await res.json()) as SyncJob;
 }
+
+// ---------------------------------------------------------------------------
+// conversations
+// ---------------------------------------------------------------------------
+
+export interface Conversation {
+  id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+}
+
+export interface ConversationDetail extends Conversation {
+  messages: Message[];
+}
+
+export interface ConversationList {
+  items: Conversation[];
+  next_cursor: string | null;
+}
+
+export async function createConversation(): Promise<Conversation> {
+  const res = await fetch(`${API_BASE}/conversations`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`/conversations POST failed: ${res.status}`);
+  return (await res.json()) as Conversation;
+}
+
+export async function listConversations(cursor?: string): Promise<ConversationList> {
+  const url = cursor
+    ? `${API_BASE}/conversations?cursor=${encodeURIComponent(cursor)}`
+    : `${API_BASE}/conversations`;
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok) throw new Error(`/conversations GET failed: ${res.status}`);
+  return (await res.json()) as ConversationList;
+}
+
+export async function getConversation(id: string): Promise<ConversationDetail> {
+  const res = await fetch(`${API_BASE}/conversations/${id}`, {
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`/conversations/${id} failed: ${res.status}`);
+  return (await res.json()) as ConversationDetail;
+}
+
+export async function deleteConversation(id: string): Promise<void> {
+  await fetch(`${API_BASE}/conversations/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+}
+
+// returns the fetch Response so callers can read the SSE body as a stream
+export function sendMessage(conversationId: string, content: string): Promise<Response> {
+  return fetch(`${API_BASE}/conversations/${conversationId}/messages`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+}

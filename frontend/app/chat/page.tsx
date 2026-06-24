@@ -1,67 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-import { fetchMe, logout, type Me } from "@/lib/api";
-import ReconnectBanner from "@/components/reconnect-banner";
-import SyncStatus from "@/components/sync-status";
+import { createConversation, fetchMe, listConversations } from "@/lib/api";
 
-// phase 2: auth guard + sync trigger + freshness indicator.
-// real chat ui lands in phase 3.
+// redirect to most recent conversation, or create a new one if none exist.
 export default function ChatPage() {
   const router = useRouter();
-  const [me, setMe] = useState<Me | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    fetchMe()
-      .then((m) => {
+
+    async function redirect() {
+      const user = await fetchMe();
+      if (!active) return;
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
+
+      try {
+        const list = await listConversations();
         if (!active) return;
-        if (!m) {
-          router.replace("/login");
-          return;
+        if (list.items.length > 0) {
+          router.replace(`/chat/${list.items[0].id}`);
+        } else {
+          const conv = await createConversation();
+          if (!active) return;
+          router.replace(`/chat/${conv.id}`);
         }
-        setMe(m);
-        setLoading(false);
-      })
-      .catch(() => {
-        if (active) setLoading(false);
-      });
+      } catch {
+        // if something fails, create a fresh conversation
+        try {
+          const conv = await createConversation();
+          if (active) router.replace(`/chat/${conv.id}`);
+        } catch {
+          if (active) router.replace("/login");
+        }
+      }
+    }
+
+    redirect().catch(() => {
+      if (active) router.replace("/login");
+    });
+
     return () => {
       active = false;
     };
   }, [router]);
 
-  if (loading) {
-    return (
-      <main className="flex flex-1 min-h-screen items-center justify-center text-zinc-500">
-        loading…
-      </main>
-    );
-  }
-  if (!me) return null;
-
   return (
-    <main className="flex flex-1 min-h-screen flex-col">
-      {!me.anilist_connected && <ReconnectBanner />}
-      <SyncStatus me={me} onSyncComplete={setMe} />
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-        <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">
-          welcome, {me.username}
-        </h1>
-        <p className="text-zinc-600 dark:text-zinc-400">chat ui lands in phase 3.</p>
-        <button
-          onClick={async () => {
-            await logout();
-            router.replace("/login");
-          }}
-          className="h-10 rounded-full border border-zinc-300 px-5 text-sm font-medium transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
-        >
-          log out
-        </button>
-      </div>
-    </main>
+    <div className="flex h-screen items-center justify-center text-zinc-500 text-sm">
+      loading…
+    </div>
   );
 }
