@@ -248,6 +248,11 @@ class AnimeSearchResult(BaseModel):
     genres: list[str] = []
     episodes: int | None = None
     averageScore: int | None = None
+    status: str | None = None
+    description: str | None = None
+    format: str | None = None
+    season: str | None = None
+    seasonYear: int | None = None
 
     @property
     def display_title(self) -> str:
@@ -262,10 +267,16 @@ class AnimeSearchResult(BaseModel):
             "genres": self.genres,
             "episodes": self.episodes,
             "average_score": self.averageScore,
+            "status": self.status,
+            "description": self.description,
+            "format": self.format,
+            "season": self.season,
+            "season_year": self.seasonYear,
         }
 
 
-_MEDIA_FIELDS = "id title { romaji english } genres episodes averageScore"
+_MEDIA_FIELDS = """id title { romaji english } genres episodes averageScore
+    status description(asHtml: false) format season seasonYear"""
 
 _SEASON_QUERY = """
 query ($season: MediaSeason, $seasonYear: Int) {
