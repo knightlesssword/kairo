@@ -1,23 +1,21 @@
-"""Chat service: gate -> extract -> lookup -> assemble -> stream.
+"""Chat service: extract -> lookup -> assemble -> stream.
 
-message flow (per plan.md):
-  1. heuristic gate: regex check on user message
-  2. if gate passes: cheap extraction LLM call -> {anime_titles, wants_current_season, intent}
-  3. optional AniList lookup (<=2 queries total, only if extraction succeeded)
-  4. context assembly via context_builder
-  5. main LLM streaming call
-  6. yield SSE-ready dicts: {type: delta|anime_card|done|error, ...}
-  7. caller persists user + assistant messages after stream completes
+message flow:
+  1. entity extraction: always run LLM call -> {anime_titles, wants_current_season, intent}
+  2. AniList lookup: if anime_titles detected, always lookup (no gate)
+  3. context assembly via context_builder
+  4. main LLM streaming call
+  5. yield SSE-ready dicts: {type: delta|anime_card|done|error, ...}
+  6. caller persists user + assistant messages after stream completes
 
 the AniList lookup is skipped gracefully if the user's token is disconnected.
-extraction failures are treated as gate=false (log + continue without lookup).
+extraction failures log + continue without lookup.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import re
 import uuid
 from collections.abc import AsyncGenerator
 
@@ -45,25 +43,6 @@ from app.services.context_builder import build_context
 from app.services.crypto import decrypt_token
 
 log = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# heuristic gate
-# ---------------------------------------------------------------------------
-
-# triggers extraction when any of these patterns match the user message
-_GATE_PATTERNS = [
-    re.compile(r'"[^"]+"'),                          # quoted text
-    re.compile(r"(?:^|\s)(?:[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)"),  # CapWords span
-    re.compile(r"\b(?:vs|versus|watch|watching)\b", re.IGNORECASE),
-    re.compile(r"\b(?:this|next|current)\s+season\b", re.IGNORECASE),
-    re.compile(r"\bairing\b", re.IGNORECASE),
-    re.compile(r"\bright\s+now\b", re.IGNORECASE),
-]
-
-
-def _gate_passes(message: str) -> bool:
-    return any(p.search(message) for p in _GATE_PATTERNS)
-
 
 # ---------------------------------------------------------------------------
 # extraction output schema
@@ -171,13 +150,12 @@ async def stream_chat(
     """
     settings = get_settings()
 
-    # step 1: heuristic gate
+    # step 1: always extract entities
     looked_up_anime: list[dict] = []
-    if _gate_passes(user_message):
-        extraction = await _extract_entities(user_message)
-        if extraction and (extraction.anime_titles or extraction.wants_current_season):
-            # step 2: AniList lookup
-            looked_up_anime = await _lookup_anime(user, db, extraction)
+    extraction = await _extract_entities(user_message)
+    if extraction and (extraction.anime_titles or extraction.wants_current_season):
+        # step 2: AniList lookup whenever titles detected
+        looked_up_anime = await _lookup_anime(user, db, extraction)
 
     # emit anime_card events before the stream starts so the frontend can render them
     for anime in looked_up_anime:
