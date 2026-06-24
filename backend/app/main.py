@@ -16,6 +16,7 @@ from starlette.requests import Request
 
 from app.config import get_settings
 from app.database import dispose_engine
+from app.routers import auth
 
 logging.basicConfig(
     level=logging.INFO,
@@ -65,7 +66,7 @@ def create_app() -> FastAPI:
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    # phase 1+: app.include_router(auth.router) etc.
+    app.include_router(auth.router)
 
     return app
 

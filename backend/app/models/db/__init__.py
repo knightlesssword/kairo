@@ -5,6 +5,6 @@ populated for alembic autogenerate. add new model modules to `__all__` and the i
 below as they are created.
 """
 
-# phase 1+: from app.models.db.user import User, Session  # noqa: F401
+from app.models.db.user import Session, User  # noqa: F401
 
-__all__: list[str] = []
+__all__: list[str] = ["User", "Session"]
