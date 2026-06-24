@@ -203,6 +203,15 @@ async def stream_chat(
     messages = [*bundle.history, user_turn]
 
     # step 5: stream
+    log.debug(
+        "final_messages | system=%d chars | history=%d | user=%r | looked_up=%d",
+        len(bundle.system_prompt),
+        len(bundle.history),
+        user_message[:120],
+        len(looked_up_anime),
+    )
+    if log.isEnabledFor(logging.DEBUG):
+        log.debug("system_prompt_sent:\n%s", bundle.system_prompt)
     try:
         llm = _get_answer_llm()
         async for delta in llm.stream(messages, system=bundle.system_prompt):

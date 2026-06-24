@@ -183,12 +183,14 @@ def _build_system_message(
         parts.extend(f"  {_format_entry(e)}" for e in dropped)
         parts.append("")
 
+    import json
+    parts.append("LOOKED UP ANIME:")
     if looked_up_anime:
-        import json
-        parts.append("LOOKED UP ANIME:")
         for anime in looked_up_anime:
             parts.append(f"  {json.dumps(anime)}")
-        parts.append("")
+    else:
+        parts.append("  None")
+    parts.append("")
 
     return "\n".join(parts)
 
