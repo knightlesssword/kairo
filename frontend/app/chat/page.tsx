@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 
 import { fetchMe, logout, type Me } from "@/lib/api";
 import ReconnectBanner from "@/components/reconnect-banner";
+import SyncStatus from "@/components/sync-status";
 
-// phase 1 placeholder: guards the route via /auth/me and renders the reconnect banner.
-// the real chat ui lands in phase 3.
+// phase 2: auth guard + sync trigger + freshness indicator.
+// real chat ui lands in phase 3.
 export default function ChatPage() {
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
@@ -45,6 +46,7 @@ export default function ChatPage() {
   return (
     <main className="flex flex-1 min-h-screen flex-col">
       {!me.anilist_connected && <ReconnectBanner />}
+      <SyncStatus me={me} onSyncComplete={setMe} />
       <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
         <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">
           welcome, {me.username}

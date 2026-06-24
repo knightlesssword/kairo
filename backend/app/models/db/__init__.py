@@ -6,5 +6,18 @@ below as they are created.
 """
 
 from app.models.db.user import Session, User  # noqa: F401
+from app.models.db.profile import (  # noqa: F401
+    AnilistProfile,
+    SyncJob,
+    TasteProfile,
+    UserAnimeList,
+)
 
-__all__: list[str] = ["User", "Session"]
+__all__: list[str] = [
+    "User",
+    "Session",
+    "AnilistProfile",
+    "UserAnimeList",
+    "TasteProfile",
+    "SyncJob",
+]

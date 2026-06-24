@@ -13,6 +13,8 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response, 
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy import select
+
 from app.config import get_settings
 from app.cookies import (
     SESSION_COOKIE_NAME,
@@ -23,7 +25,9 @@ from app.cookies import (
     set_state_cookie,
 )
 from app.database import get_session
+from app.database import get_session
 from app.dependencies import get_current_user
+from app.models.db.profile import AnilistProfile
 from app.models.db.user import User
 from app.models.schemas.auth import MeResponse
 from app.services import auth_service
@@ -98,11 +102,18 @@ async def logout(
 
 
 @router.get("/me", response_model=MeResponse)
-async def me(user: User = Depends(get_current_user)) -> MeResponse:
+async def me(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+) -> MeResponse:
+    result = await db.execute(
+        select(AnilistProfile.synced_at).where(AnilistProfile.user_id == user.id)
+    )
+    last_synced_at = result.scalar_one_or_none()
     return MeResponse(
         id=user.id,
         username=user.username,
         anilist_id=user.anilist_id,
         anilist_connected=user.anilist_connected,
-        last_synced_at=None,
+        last_synced_at=last_synced_at,
     )

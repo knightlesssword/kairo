@@ -15,8 +15,9 @@ from fastapi.responses import JSONResponse
 from starlette.requests import Request
 
 from app.config import get_settings
-from app.database import dispose_engine
-from app.routers import auth
+from app.database import SessionFactory, dispose_engine
+from app.routers import auth, profile
+from app.services import sync_service
 
 logging.basicConfig(
     level=logging.INFO,
@@ -29,7 +30,11 @@ logger = logging.getLogger("kairo")
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     logger.info("kairo backend starting (env=%s)", settings.environment)
-    # phase 2: sync-job stale reaper hook goes here
+    async with SessionFactory() as db:
+        reaped = await sync_service.stale_job_reaper(db)
+        await db.commit()
+        if reaped:
+            logger.info("startup: reaped %d stale sync job(s)", reaped)
     yield
     await dispose_engine()
     logger.info("kairo backend stopped")
@@ -67,6 +72,7 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(auth.router)
+    app.include_router(profile.router)
 
     return app
 

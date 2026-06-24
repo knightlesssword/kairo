@@ -28,3 +28,28 @@ export async function fetchMe(): Promise<Me | null> {
 export async function logout(): Promise<void> {
   await fetch(`${API_BASE}/auth/logout`, { method: "POST", credentials: "include" });
 }
+
+export interface SyncJob {
+  job_id: string;
+  status: "pending" | "running" | "completed" | "failed";
+  error?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+}
+
+export async function postSync(): Promise<SyncJob> {
+  const res = await fetch(`${API_BASE}/profile/sync`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`/profile/sync failed: ${res.status}`);
+  return (await res.json()) as SyncJob;
+}
+
+export async function getSyncJob(jobId: string): Promise<SyncJob> {
+  const res = await fetch(`${API_BASE}/profile/sync/${jobId}`, {
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`/profile/sync/${jobId} failed: ${res.status}`);
+  return (await res.json()) as SyncJob;
+}
