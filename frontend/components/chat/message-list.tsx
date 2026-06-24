@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import type { AnimeCard } from "@/lib/stream";
 import AnimeCardComponent from "@/components/chat/anime-card";
@@ -56,7 +57,7 @@ export default function MessageList({ messages }: Props) {
               <>
                 <div className="prose prose-sm dark:prose-invert max-w-none text-zinc-800 dark:text-zinc-200">
                   {msg.content ? (
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                   ) : msg.streaming ? (
                     <span className="animate-pulse text-zinc-400">▍</span>
                   ) : null}
