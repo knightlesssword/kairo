@@ -16,13 +16,11 @@ from starlette.requests import Request
 
 from app.config import get_settings
 from app.database import SessionFactory, dispose_engine
+from app.observability import RequestContextMiddleware, configure_logging, get_request_id
 from app.routers import auth, conversations, profile
 from app.services import sync_service
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
-)
+configure_logging(get_settings().log_level)
 logger = logging.getLogger("kairo")
 
 
@@ -63,9 +61,13 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-        # fail loud in logs, generic to client (no internal leakage)
+        # fail loud in logs (full stack via exc_info), generic to client (no internal
+        # leakage). request_id lets the client report an id that maps to the log line.
         logger.exception("unhandled error on %s %s", request.method, request.url.path)
-        return JSONResponse(status_code=500, content={"detail": "internal server error"})
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "internal server error", "request_id": get_request_id()},
+        )
 
     @app.get("/health", tags=["meta"])
     async def health() -> dict[str, str]:
@@ -78,4 +80,8 @@ def create_app() -> FastAPI:
     return app
 
 
-app = create_app()
+# wrap OUTSIDE the FastAPI app (and thus outside starlette's ServerErrorMiddleware,
+# which runs the 500 handler): the request id must be bound before that handler runs
+# and the X-Request-ID header must be attachable even to error responses. this is the
+# ASGI app uvicorn serves and tests should exercise.
+app = RequestContextMiddleware(create_app())

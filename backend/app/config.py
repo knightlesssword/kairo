@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     # core
     environment: Environment = "development"
     database_url: PostgresDsn
+    log_level: str = "INFO"
 
     # secrets (no defaults on purpose)
     fernet_key: str

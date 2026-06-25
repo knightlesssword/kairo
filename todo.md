@@ -256,9 +256,17 @@ operating rules for this phase:
 
 ### 3 - observability
 
-- [ ] structured logging + global exception handler in main.py (consistent error
+- [x] structured logging + global exception handler in main.py (consistent error
       envelope, log with request context, no stack trace to client, fail loud).
       done when: unhandled error -> structured json error + structured log line.
+      impl: app/observability.py = JsonFormatter (1-line json: ts/level/logger/msg/
+      request_id + extra fields + exc) + RequestIdFilter + RequestContextMiddleware
+      (pure-ASGI, server-minted uuid4 request id, X-Request-ID response header).
+      wired OUTSIDE create_app() so the id is bound before starlette's
+      ServerErrorMiddleware runs the 500 handler. 500 body now carries request_id.
+      log_level setting added. [verified via TestClient on real wiring: header on
+      200+500, body/header/handler-log request_id all match, stack only in log not
+      client, ids unique]
 
 ### 4 - tests
 
