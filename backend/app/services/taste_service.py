@@ -188,8 +188,13 @@ async def generate_taste_profile(
     # re-query by user_id: inserted_primary_key is unreliable in the UPDATE path of
     # ON CONFLICT DO UPDATE (PostgreSQL returns it, but SQLAlchemy's implicit RETURNING
     # behaviour on upserts is not guaranteed across driver versions).
+    # populate_existing forces a reload past the ORM identity map; without it a
+    # session that already loaded TasteProfile (from the `existing` check above)
+    # would return the stale pre-upsert object.
     updated_result = await db.execute(
-        select(TasteProfile).where(TasteProfile.user_id == user_id)
+        select(TasteProfile)
+        .where(TasteProfile.user_id == user_id)
+        .execution_options(populate_existing=True)
     )
     updated = updated_result.scalar_one()
     log.info("taste profile: generated v%d for user %s", new_version, user_id)
