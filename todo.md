@@ -237,10 +237,11 @@ operating rules for this phase:
 
 ### 2 - provider abstraction (factory + ollama only; openai/anthropic deferred v2)
 
-- [ ] **B3** `llm/factory.py`: `get_llm_provider(settings)`, `get_answer_llm()`,
-      `get_extraction_llm()` (extraction model falls back to llm_model). supports
-      openrouter + ollama only.
-      done when: switching `LLM_PROVIDER` selects the right impl; imports clean.
+- [x] **B3** `llm/factory.py`: `get_answer_llm()` / `get_extraction_llm()` (extraction
+      model falls back to llm_model), `_build_provider` selects from llm_provider.
+      openrouter + ollama only; openai/anthropic raise LLMError (deferred v2). ollama
+      lazy-imported in its branch (ships in next task). settings override param for tests.
+      done when: switching `LLM_PROVIDER` selects the right impl; imports clean. [verified]
 - [ ] **B2 (partial)** `llm/ollama.py`: implements LLMProvider against
       `{ollama_base_url}/api/chat`; stream via NDJSON; raises LLMError.
       done when: imports clean; structurally matches ABC; ollama swap streams.
