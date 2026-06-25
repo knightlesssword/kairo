@@ -270,11 +270,24 @@ operating rules for this phase:
 
 ### 4 - tests
 
-- [ ] **test harness** (belongs to this bucket, not incidental): pytest +
+- [x] **test harness** (belongs to this bucket, not incidental): pytest +
       pytest-asyncio; dedicated test `DATABASE_URL` (NOT the dev compose pg on
       5433); alembic migrations applied in test setup; async session fixture;
       transactional rollback or schema recreate per test.
       done when: `pytest` runs green against the isolated test db.
+      impl: tests/conftest.py reads TEST_DATABASE_URL, copies it to DATABASE_URL
+      BEFORE app import (single engine -> test db), rebinds engine to NullPool
+      (no cross-loop asyncpg reuse), runs `alembic upgrade head` via subprocess
+      once/session, TRUNCATE ... RESTART IDENTITY CASCADE per test (chosen over
+      txn-rollback because routes/services commit their own sessions). fixtures:
+      db (async session), client (httpx ASGITransport over real app). fail-loud
+      if TEST_DATABASE_URL unset; refuses :5433. tests/test_harness.py = 4 smoke
+      tests (schema migrated, isolation across 2 tests, /health + x-request-id).
+      [verified green vs ephemeral pg on 5434; both guard paths fire]
+      spin a throwaway test pg:
+        docker run -d --name kairo-testpg -e POSTGRES_USER=test \
+          -e POSTGRES_PASSWORD=test -e POSTGRES_DB=kairo_test -p 5434:5432 postgres:16
+        export TEST_DATABASE_URL=postgresql+asyncpg://test:test@localhost:5434/kairo_test
 - [ ] cross-user data isolation (second user read/delete -> 403/404)
 - [ ] oauth callback (state validation, token encrypted at rest, session set)
 - [ ] context token-budget bound (large list/conversation stays under cap)
