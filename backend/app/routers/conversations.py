@@ -16,7 +16,7 @@ from typing import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -29,6 +29,12 @@ from app.services import conversation_service
 from app.services.chat_service import stream_chat
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
+
+
+# absolute hard ceiling for a single user message, independent of the tunable
+# product cap (settings.max_user_message_chars). guards against pathological bodies
+# and gives a schema-level 422. operators must keep max_user_message_chars <= this.
+MESSAGE_HARD_CAP_CHARS = 10_000
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +69,13 @@ class ConversationListResponse(BaseModel):
 
 
 class SendMessageRequest(BaseModel):
-    content: str
+    # two-layer validation:
+    #   schema (here): strip + non-empty + absolute hard ceiling -> 422 at parse time,
+    #     and a DoS guard against pathological payloads.
+    #   handler: the tunable product cap (settings.max_user_message_chars, default 2000),
+    #     which must stay <= MESSAGE_HARD_CAP_CHARS.
+    model_config = ConfigDict(str_strip_whitespace=True)
+    content: str = Field(min_length=1, max_length=MESSAGE_HARD_CAP_CHARS)
 
 
 # ---------------------------------------------------------------------------
@@ -176,10 +188,9 @@ async def send_message(
     # validate ownership before streaming
     await conversation_service.get_conversation(user.id, conversation_id, db)
 
-    # cap message length
-    content = body.content.strip()
-    if not content:
-        raise HTTPException(status_code=400, detail="message content is empty")
+    # content is already stripped + bounded [1, MESSAGE_HARD_CAP_CHARS] by the schema.
+    # enforce the tunable product cap here.
+    content = body.content
     if len(content) > settings.max_user_message_chars:
         raise HTTPException(
             status_code=400,

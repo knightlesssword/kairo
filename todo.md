@@ -228,9 +228,12 @@ operating rules for this phase:
       per plan.md). distributed limiter (redis/equiv) is v2.
       done when: documented single-worker-only; limits verified under a one-worker
       run (over-limit -> 429, under-limit passes).
-- [ ] input validation pass: 2000-char user message cap at api layer, uuid
+- [x] input validation pass: 2000-char user message cap at api layer, uuid
       validation on path params, pydantic constraints on bodies.
       done when: oversized msg -> 422/400; malformed uuid -> 422; valid unaffected.
+      audit: path uuid + query bounds + status set-check already enforced. only gap
+      was SendMessageRequest (bare str) -> added strip + min_length + hard-cap Field;
+      tunable product cap stays in handler.
 
 ### 2 - provider abstraction (factory + ollama only; openai/anthropic deferred v2)
 
