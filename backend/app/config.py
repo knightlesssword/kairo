@@ -58,6 +58,13 @@ class Settings(BaseSettings):
     # sync
     sync_stale_seconds: int = 600
 
+    # rate limiting (in-process token bucket; SINGLE-WORKER only, see
+    # middleware/rate_limit.py). disable in tests that aren't exercising limits.
+    rate_limit_enabled: bool = True
+    rate_limit_auth_per_min: int = 10
+    rate_limit_chat_per_min: int = 20
+    rate_limit_sync_per_min: int = 1
+
     # frontend / cors
     frontend_origin: str = "http://localhost:3000"
 

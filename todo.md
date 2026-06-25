@@ -211,16 +211,79 @@ success = streaming chat works end-to-end with taste context injected
 
 ## phase 4 - hardening + ship
 
-- [ ] `rate_limit` middleware (auth 10/min/ip, chat 20/min/user, sync 1/min/user)
-- [ ] input validation pass (2000-char message cap, uuid validation, pydantic constraints)
-- [ ] structured logging + global error handler + error monitoring hook
-- [ ] end-to-end reconnect UX verification (expiry/401 -> `anilist_connected=false` ->
-      banner -> re-login resets flag) - core logic lives in phase 1 guard
-- [ ] docker production config, README self-host setup, finalize `.env.example`
-- [ ] tests:
-  - [ ] oauth callback (state validation, token encryption)
-  - [ ] taste schema validation + `input_hash` skip-on-unchanged
-  - [ ] context token-budget bound (large list/conversation stays under cap)
-  - [ ] user data isolation (cross-user read returns 403/404)
-  - [ ] sync recovery (stale job reaped, retryable)
-  - [ ] provider swap (ollama) smoke
+execution order: security -> provider abstraction -> observability -> tests ->
+packaging -> prompts. commit after each task; senior review before merge.
+
+operating rules for this phase:
+- minimum code that solves the problem; nothing speculative
+- touch only what the task requires; clean up only own mess
+- define success criteria per task; loop until verified
+
+### 1 - security
+
+- [x] **rate_limit** middleware: in-process token bucket. auth 10/min/ip,
+      chat 20/min/user, sync 1/min/user.
+      DECISION (locked): v1 is SINGLE-WORKER only. the in-process bucket is the
+      accepted v1 implementation (operational simplicity over horizontal scaling
+      per plan.md). distributed limiter (redis/equiv) is v2.
+      done when: documented single-worker-only; limits verified under a one-worker
+      run (over-limit -> 429, under-limit passes).
+- [ ] input validation pass: 2000-char user message cap at api layer, uuid
+      validation on path params, pydantic constraints on bodies.
+      done when: oversized msg -> 422/400; malformed uuid -> 422; valid unaffected.
+
+### 2 - provider abstraction (factory + ollama only; openai/anthropic deferred v2)
+
+- [ ] **B3** `llm/factory.py`: `get_llm_provider(settings)`, `get_answer_llm()`,
+      `get_extraction_llm()` (extraction model falls back to llm_model). supports
+      openrouter + ollama only.
+      done when: switching `LLM_PROVIDER` selects the right impl; imports clean.
+- [ ] **B2 (partial)** `llm/ollama.py`: implements LLMProvider against
+      `{ollama_base_url}/api/chat`; stream via NDJSON; raises LLMError.
+      done when: imports clean; structurally matches ABC; ollama swap streams.
+- [ ] replace hardcoded `OpenRouterProvider` in chat_service.py + taste_service.py
+      with factory calls; remove the local `_get_answer_llm`/`_get_extraction_llm`
+      helpers.
+      done when: no `OpenRouterProvider` import in services; chat + taste still
+      work via openrouter default.
+
+### 3 - observability
+
+- [ ] structured logging + global exception handler in main.py (consistent error
+      envelope, log with request context, no stack trace to client, fail loud).
+      done when: unhandled error -> structured json error + structured log line.
+
+### 4 - tests
+
+- [ ] **test harness** (belongs to this bucket, not incidental): pytest +
+      pytest-asyncio; dedicated test `DATABASE_URL` (NOT the dev compose pg on
+      5433); alembic migrations applied in test setup; async session fixture;
+      transactional rollback or schema recreate per test.
+      done when: `pytest` runs green against the isolated test db.
+- [ ] cross-user data isolation (second user read/delete -> 403/404)
+- [ ] oauth callback (state validation, token encrypted at rest, session set)
+- [ ] context token-budget bound (large list/conversation stays under cap)
+- [ ] sync recovery (stale job reaped + retryable, active-job dedupe)
+- [ ] provider swap (ollama) smoke
+- [ ] (carry-over) taste schema validation + `input_hash` skip-on-unchanged
+
+### 5 - packaging
+
+- [ ] docker PRODUCTION config: single uvicorn worker (matches rate-limit
+      decision), README self-host setup, finalize `.env.example` (all required
+      keys + ollama_base_url, guidance comments, no real values).
+      done when: fresh operator can bring the stack up from README + .env.example.
+
+### 6 - prompts
+
+- [ ] review prompt quality (system / taste_extraction / entity_extraction):
+      anti-hallucination rules, grounding, schema clarity, token cost. produce a
+      findings list with proposed edits for senior review BEFORE changing.
+
+### deferred / out of v1 scope
+
+- [ ] **B2 (rest)** native `llm/openai.py` + `llm/anthropic.py` -> v2 (openrouter
+      already proxies these models; no v1 need).
+- [ ] end-to-end reconnect UX verification (expiry/401 -> `anilist_connected=false`
+      -> banner -> re-login) - core logic already in phase 1 guard; manual verify
+      at ship time.

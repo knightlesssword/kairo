@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.database import get_session
 from app.dependencies import get_current_user
+from app.middleware.rate_limit import rate_limit_chat
 from app.models.db.conversation import Conversation, Message
 from app.models.db.user import User
 from app.services import conversation_service
@@ -163,7 +164,7 @@ async def delete_conversation(
     return Response(status_code=204)
 
 
-@router.post("/{conversation_id}/messages")
+@router.post("/{conversation_id}/messages", dependencies=[Depends(rate_limit_chat)])
 async def send_message(
     conversation_id: uuid.UUID,
     body: SendMessageRequest,

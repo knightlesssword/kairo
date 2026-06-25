@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.dependencies import get_current_user
+from app.middleware.rate_limit import rate_limit_sync
 from app.models.db.profile import SyncJob, TasteProfile, UserAnimeList
 from app.models.db.user import User
 from app.services import sync_service
@@ -48,7 +49,12 @@ class AnimeListEntryResponse(BaseModel):
 # sync endpoints
 # ---------------------------------------------------------------------------
 
-@router.post("/sync", response_model=SyncJobResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/sync",
+    response_model=SyncJobResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(rate_limit_sync)],
+)
 async def post_sync(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),

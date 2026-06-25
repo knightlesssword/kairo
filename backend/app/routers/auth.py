@@ -29,6 +29,7 @@ from app.database import get_session
 from app.dependencies import get_current_user
 from app.models.db.profile import AnilistProfile
 from app.models.db.user import User
+from app.middleware.rate_limit import rate_limit_auth
 from app.models.schemas.auth import MeResponse
 from app.services import auth_service
 
@@ -37,7 +38,7 @@ logger = logging.getLogger("kairo.auth")
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.get("/anilist/login")
+@router.get("/anilist/login", dependencies=[Depends(rate_limit_auth)])
 async def anilist_login() -> RedirectResponse:
     state = auth_service.generate_state()
     response = RedirectResponse(
@@ -48,7 +49,7 @@ async def anilist_login() -> RedirectResponse:
     return response
 
 
-@router.get("/anilist/callback")
+@router.get("/anilist/callback", dependencies=[Depends(rate_limit_auth)])
 async def anilist_callback(
     code: str | None = Query(default=None),
     state: str | None = Query(default=None),
