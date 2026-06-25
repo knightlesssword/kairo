@@ -242,9 +242,11 @@ operating rules for this phase:
       openrouter + ollama only; openai/anthropic raise LLMError (deferred v2). ollama
       lazy-imported in its branch (ships in next task). settings override param for tests.
       done when: switching `LLM_PROVIDER` selects the right impl; imports clean. [verified]
-- [ ] **B2 (partial)** `llm/ollama.py`: implements LLMProvider against
+- [x] **B2 (partial)** `llm/ollama.py`: implements LLMProvider against
       `{ollama_base_url}/api/chat`; stream via NDJSON; raises LLMError.
       done when: imports clean; structurally matches ABC; ollama swap streams.
+      [verified vs real api shapes via mocked transport: chat() stream=false +
+      token counts, response_schema->format, NDJSON stream deltas, non-200->LLMError]
 - [ ] replace hardcoded `OpenRouterProvider` in chat_service.py + taste_service.py
       with factory calls; remove the local `_get_answer_llm`/`_get_extraction_llm`
       helpers.
