@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.llm.base import LLMError, Message
-from app.llm.openrouter import OpenRouterProvider
+from app.llm.factory import get_extraction_llm
 from app.models.db.profile import TasteProfile, UserAnimeList
 from app.prompts.taste_extraction import TASTE_EXTRACTION_SYSTEM, build_taste_extraction_prompt
 
@@ -102,14 +102,9 @@ def _compute_input_hash(entries: list[UserAnimeList]) -> str:
 
 
 async def _call_llm(entries: list[UserAnimeList]) -> dict:
-    """generate taste profile via LLM call to OpenRouter.
-
-    B3 (factory) will later replace the direct OpenRouterProvider instantiation
-    with get_extraction_llm() so provider is selectable via LLM_PROVIDER env.
-    """
-    settings = get_settings()
-    model = settings.llm_extraction_model or settings.llm_model
-    llm = OpenRouterProvider(api_key=settings.llm_api_key, model=model)
+    """generate taste profile via the configured extraction LLM (provider-selectable
+    through LLM_PROVIDER; uses llm_extraction_model with fallback to llm_model)."""
+    llm = get_extraction_llm()
 
     entries_summary = _build_entries_summary(entries)
     log.debug("taste LLM: %d entries -> %d chars summary", len(entries), len(entries_summary))

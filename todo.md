@@ -247,11 +247,12 @@ operating rules for this phase:
       done when: imports clean; structurally matches ABC; ollama swap streams.
       [verified vs real api shapes via mocked transport: chat() stream=false +
       token counts, response_schema->format, NDJSON stream deltas, non-200->LLMError]
-- [ ] replace hardcoded `OpenRouterProvider` in chat_service.py + taste_service.py
+- [x] replace hardcoded `OpenRouterProvider` in chat_service.py + taste_service.py
       with factory calls; remove the local `_get_answer_llm`/`_get_extraction_llm`
       helpers.
       done when: no `OpenRouterProvider` import in services; chat + taste still
-      work via openrouter default.
+      work via openrouter default. [verified: imports clean, both services route
+      through factory.get_extraction_llm / get_answer_llm via mocked providers]
 
 ### 3 - observability
 

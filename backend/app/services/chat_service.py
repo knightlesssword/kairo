@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.llm.base import LLMError, Message as LLMMessage
-from app.llm.openrouter import OpenRouterProvider
+from app.llm.factory import get_answer_llm, get_extraction_llm
 from app.models.db.user import User
 from app.prompts.entity_extraction import (
     ENTITY_EXTRACTION_SCHEMA,
@@ -56,28 +56,13 @@ class _ExtractionResult(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# provider helpers (no factory yet; openrouter only until B3)
-# ---------------------------------------------------------------------------
-
-def _get_answer_llm() -> OpenRouterProvider:
-    s = get_settings()
-    return OpenRouterProvider(api_key=s.llm_api_key, model=s.llm_model)
-
-
-def _get_extraction_llm() -> OpenRouterProvider:
-    s = get_settings()
-    model = s.llm_extraction_model or s.llm_model
-    return OpenRouterProvider(api_key=s.llm_api_key, model=model)
-
-
-# ---------------------------------------------------------------------------
 # extraction step
 # ---------------------------------------------------------------------------
 
 async def _extract_entities(message: str) -> _ExtractionResult | None:
     """run cheap extraction LLM call. returns None on any failure (gate treated as miss)."""
     try:
-        llm = _get_extraction_llm()
+        llm = get_extraction_llm()
         resp = await llm.chat(
             messages=[LLMMessage(role="user", content=build_entity_extraction_prompt(message))],
             system=ENTITY_EXTRACTION_SYSTEM,
@@ -191,7 +176,7 @@ async def stream_chat(
     if log.isEnabledFor(logging.DEBUG):
         log.debug("system_prompt_sent:\n%s", bundle.system_prompt)
     try:
-        llm = _get_answer_llm()
+        llm = get_answer_llm()
         async for delta in llm.stream(messages, system=bundle.system_prompt):
             yield {"type": "delta", "content": delta}
     except LLMError as exc:
