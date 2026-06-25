@@ -1,12 +1,13 @@
 """Chat service: extract -> lookup -> assemble -> stream.
 
 message flow:
-  1. entity extraction: always run LLM call -> {anime_titles, wants_current_season, intent}
-  2. AniList lookup: if anime_titles detected, always lookup (no gate)
-  3. context assembly via context_builder
-  4. main LLM streaming call
-  5. yield SSE-ready dicts: {type: delta|anime_card|done|error, ...}
-  6. caller persists user + assistant messages after stream completes
+  1. entity extraction: always run LLM call -> {anime_titles, wants_current_season}
+  2. AniList metadata lookup: if anime_titles detected (no gate)
+  3. user list entry lookup: for detected titles, fetch exact rows from user_anime_list
+  4. context assembly via context_builder
+  5. main LLM streaming call
+  6. yield SSE-ready dicts: {type: delta|anime_card|done|error, ...}
+  7. caller persists user + assistant messages after stream completes
 
 the AniList lookup is skipped gracefully if the user's token is disconnected.
 extraction failures log + continue without lookup.
@@ -20,18 +21,19 @@ import uuid
 from collections.abc import AsyncGenerator
 
 from pydantic import BaseModel, ConfigDict, ValidationError
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.llm.base import LLMError, Message as LLMMessage
 from app.llm.factory import get_answer_llm, get_extraction_llm
+from app.models.db.profile import UserAnimeList
 from app.models.db.user import User
 from app.prompts.entity_extraction import (
     ENTITY_EXTRACTION_SCHEMA,
     ENTITY_EXTRACTION_SYSTEM,
     build_entity_extraction_prompt,
 )
-from app.prompts.system import SYSTEM_PROMPT
 from app.services.anilist_guard import AniListDisconnected, assert_token_valid
 from app.services.anilist_service import (
     AniListError,
@@ -72,6 +74,51 @@ async def _extract_entities(message: str) -> _ExtractionResult | None:
     except (LLMError, json.JSONDecodeError, ValidationError) as exc:
         log.warning("entity extraction failed (treating as gate miss): %s", exc)
         return None
+
+
+# ---------------------------------------------------------------------------
+# user list entry lookup step
+# ---------------------------------------------------------------------------
+
+async def _lookup_user_entries(
+    user_id: uuid.UUID,
+    db: AsyncSession,
+    anilist_ids: list[int],
+    title_fallback: list[str],
+) -> list[dict]:
+    """look up user_anime_list rows for specifically mentioned titles.
+
+    prefers anilist_id match (authoritative). falls back to case-insensitive
+    title match when ids are unavailable (no AniList token or lookup miss).
+    """
+    if anilist_ids:
+        result = await db.execute(
+            select(UserAnimeList).where(
+                UserAnimeList.user_id == user_id,
+                UserAnimeList.anilist_anime_id.in_(anilist_ids),
+            )
+        )
+    elif title_fallback:
+        result = await db.execute(
+            select(UserAnimeList).where(
+                UserAnimeList.user_id == user_id,
+                or_(*[UserAnimeList.title.ilike(t) for t in title_fallback]),
+            )
+        )
+    else:
+        return []
+
+    rows = result.scalars().all()
+    return [
+        {
+            "title": r.title,
+            "status": r.status,
+            "score": r.score,
+            "progress": r.progress,
+            "updated_at": r.updated_at.date().isoformat() if r.updated_at else None,
+        }
+        for r in rows
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -136,16 +183,27 @@ async def stream_chat(
 
     # step 1: always extract entities
     looked_up_anime: list[dict] = []
+    user_entries: list[dict] = []
     extraction = await _extract_entities(user_message)
     if extraction and (extraction.anime_titles or extraction.wants_current_season):
-        # step 2: AniList lookup whenever titles detected
+        # step 2: AniList metadata lookup whenever titles detected
         looked_up_anime = await _lookup_anime(user, db, extraction)
+
+        # step 3: user list entry lookup for mentioned titles
+        # prefer anilist_id match; fall back to title when lookup was skipped
+        anilist_ids = [a["id"] for a in looked_up_anime if "id" in a]
+        user_entries = await _lookup_user_entries(
+            user.id,
+            db,
+            anilist_ids=anilist_ids,
+            title_fallback=extraction.anime_titles if not anilist_ids else [],
+        )
 
     # emit anime_card events before the stream starts so the frontend can render them
     for anime in looked_up_anime:
         yield {"type": "anime_card", "anime": anime}
 
-    # step 3: context assembly
+    # step 4: context assembly
     try:
         bundle = await build_context(
             user_id=user.id,
@@ -154,17 +212,18 @@ async def stream_chat(
             max_tokens=settings.max_context_tokens,
             history_limit=settings.history_message_limit,
             looked_up_anime=looked_up_anime,
+            user_entries=user_entries,
         )
     except Exception as exc:
         log.error("context build failed: %s", exc)
         yield {"type": "error", "message": "failed to assemble context"}
         return
 
-    # step 4: assemble messages for LLM
+    # step 5: assemble messages for LLM
     user_turn = LLMMessage(role="user", content=user_message)
     messages = [*bundle.history, user_turn]
 
-    # step 5: stream
+    # step 6: stream
     log.debug(
         "final_messages | system=%d chars | history=%d | user=%r | looked_up=%d",
         len(bundle.system_prompt),

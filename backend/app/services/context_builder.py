@@ -148,6 +148,7 @@ def _build_system_message(
     dropped: list[UserAnimeList],
     status_counts: dict[str, int],
     looked_up_anime: list[dict],
+    user_entries: list[dict],
     current_date: str,
     current_season: str,
 ) -> str:
@@ -192,6 +193,14 @@ def _build_system_message(
         parts.append("  None")
     parts.append("")
 
+    parts.append("USER_ANIME_ENTRIES:")
+    if user_entries:
+        for entry in user_entries:
+            parts.append(f"  {json.dumps(entry)}")
+    else:
+        parts.append("  None")
+    parts.append("")
+
     return "\n".join(parts)
 
 
@@ -227,8 +236,10 @@ async def build_context(
     max_tokens: int,
     history_limit: int,
     looked_up_anime: list[dict] | None = None,
+    user_entries: list[dict] | None = None,
 ) -> ContextBundle:
     looked_up_anime = looked_up_anime or []
+    user_entries = user_entries or []
 
     # load taste profile
     taste_result = await db.execute(
@@ -261,7 +272,7 @@ async def build_context(
     ) -> tuple[str, int]:
         sys_msg = _build_system_message(
             taste_profile, top_s, recent_s, dropped_s,
-            status_counts, looked_up_anime, current_date, current_season,
+            status_counts, looked_up_anime, user_entries, current_date, current_season,
         )
         hist_tokens = sum(_count_tokens(m.content) for m in hist)
         total = _count_tokens(sys_msg) + hist_tokens
@@ -302,6 +313,7 @@ async def build_context(
         "dropped_count": len(dropped),
         "history_count": len(history),
         "looked_up_count": len(looked_up_anime),
+        "user_entries_count": len(user_entries),
         "token_estimate": token_est,
     }
 
