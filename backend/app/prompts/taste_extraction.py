@@ -33,10 +33,10 @@ Return ONLY valid JSON matching this exact structure - no explanation, no markdo
 }}
 
 Rules:
-- likes/dislikes: qualitative descriptors (themes, pacing, tone, tropes) - not genre names alone
-- favorites: actual titles from the list with score >= 8 or COMPLETED with no score
-- prefers_completed: true if the user has significantly more COMPLETED than PLANNING/CURRENT
-- preferred_length: short (<13 eps), medium (13-50 eps), long (>50 eps) - pick the mode by count
+- likes/dislikes: qualitative descriptors (themes, pacing, tone, tropes) — not genre names, not anime titles
+- favorites: actual titles from the list with score >= 8 only; unscored entries do not qualify
+- prefers_completed: true if COMPLETED count > PLANNING + CURRENT count combined
+- preferred_length: short (<13 eps), medium (13-50 eps), long (>50 eps) — pick the mode by count of COMPLETED entries only
 - minimum 2 items in likes; minimum 1 in favorites if any qualify
 - if the list is too sparse to infer preferences, use reasonable defaults
 """

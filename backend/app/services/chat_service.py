@@ -52,7 +52,6 @@ class _ExtractionResult(BaseModel):
     model_config = ConfigDict(extra="ignore")
     anime_titles: list[str] = []
     wants_current_season: bool = False
-    intent: str = ""
 
 
 # ---------------------------------------------------------------------------

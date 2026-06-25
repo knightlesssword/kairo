@@ -3,7 +3,7 @@
 used by the heuristic gate in chat_service when the message plausibly references
 a specific anime title or asks about current/airing season.
 
-output: {anime_titles: list[str], wants_current_season: bool, intent: str}
+output: {anime_titles: list[str], wants_current_season: bool}
 """
 
 from __future__ import annotations
@@ -21,12 +21,8 @@ ENTITY_EXTRACTION_SCHEMA: dict = {
             "type": "boolean",
             "description": "true if the user is asking about currently airing or this season's anime",
         },
-        "intent": {
-            "type": "string",
-            "description": "one-line description of what the user wants",
-        },
     },
-    "required": ["anime_titles", "wants_current_season", "intent"],
+    "required": ["anime_titles", "wants_current_season"],
     "additionalProperties": False,
 }
 
@@ -44,12 +40,10 @@ MESSAGE: {user_message}
 Return ONLY valid JSON - no explanation, no markdown fences:
 {{
   "anime_titles": ["<title>", ...],
-  "wants_current_season": <true|false>,
-  "intent": "<one line>"
+  "wants_current_season": <true|false>
 }}
 
 Rules:
 - anime_titles: only extract titles that are clearly named; empty list if none
 - wants_current_season: true only if the user asks about airing/this season/current season
-- intent: brief description of what they want (e.g. "find anime similar to Attack on Titan")
 """
