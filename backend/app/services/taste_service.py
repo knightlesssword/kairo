@@ -43,7 +43,7 @@ class TasteProfileSchema(BaseModel):
     model_config = ConfigDict(extra="ignore")
     likes: list[str]
     dislikes: list[str]
-    favorites: list[str]
+    favorites: list[int]
     watch_style: WatchStyle
 
 
@@ -56,7 +56,7 @@ _TASTE_RESPONSE_SCHEMA: dict = {
     "properties": {
         "likes": {"type": "array", "items": {"type": "string"}},
         "dislikes": {"type": "array", "items": {"type": "string"}},
-        "favorites": {"type": "array", "items": {"type": "string"}},
+        "favorites": {"type": "array", "items": {"type": "integer"}},
         "watch_style": {
             "type": "object",
             "properties": {
@@ -73,6 +73,9 @@ _TASTE_RESPONSE_SCHEMA: dict = {
 
 _STATUS_PRIORITY = {"COMPLETED": 0, "REPEATING": 1, "CURRENT": 2, "DROPPED": 3}
 
+# bump when the prompt schema changes to invalidate cached profiles
+_PROMPT_VERSION = "v2"
+
 
 def _build_entries_summary(entries: list[UserAnimeList], max_entries: int = 200) -> str:
     """compact one-line-per-entry summary, prioritized by status then score."""
@@ -84,7 +87,7 @@ def _build_entries_summary(entries: list[UserAnimeList], max_entries: int = 200)
     for e in ordered:
         genres = ",".join(e.genres or [])
         score_str = str(e.score) if e.score is not None else "unscored"
-        lines.append(f"{e.title or 'Unknown'} | {e.status} | score:{score_str} | genres:{genres}")
+        lines.append(f"id:{e.anilist_anime_id} | {e.title or 'Unknown'} | {e.status} | score:{score_str} | genres:{genres}")
     return "\n".join(lines)
 
 
@@ -97,7 +100,7 @@ def _compute_input_hash(entries: list[UserAnimeList]) -> str:
         (e.anilist_anime_id, e.status, e.score or 0.0)
         for e in entries
     )
-    raw = json.dumps(tuples, separators=(",", ":"))
+    raw = json.dumps([_PROMPT_VERSION, tuples], separators=(",", ":"))
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
