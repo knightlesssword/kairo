@@ -25,6 +25,7 @@ export default function ConversationList({ me, isOpen = true, onNewConversation 
   const [items, setItems] = useState<Conversation[]>([]);
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
   // re-fetch on pathname changes so backend-set titles appear after first message
@@ -47,10 +48,16 @@ export default function ConversationList({ me, isOpen = true, onNewConversation 
     }
   }
 
-  async function handleDelete(e: React.MouseEvent, convId: string) {
+  function handleDeleteClick(e: React.MouseEvent, convId: string) {
     e.preventDefault();
     e.stopPropagation();
     if (deletingId) return;
+    setConfirmDeleteId(convId);
+  }
+
+  async function handleDelete(convId: string) {
+    if (deletingId) return;
+    setConfirmDeleteId(null);
     setDeletingId(convId);
 
     // capture remaining BEFORE the state update to avoid stale closure in the redirect branch
@@ -190,28 +197,46 @@ export default function ConversationList({ me, isOpen = true, onNewConversation 
                   {conv.title ?? "new conversation"}
                 </Link>
 
-                {/* Delete button — visible on group hover */}
-                <button
-                  onClick={(e) => handleDelete(e, conv.id)}
-                  disabled={isDeleting}
-                  aria-label="delete conversation"
-                  className="absolute right-1 hidden group-hover:flex h-6 w-6 shrink-0
-                             items-center justify-center rounded text-text-muted
-                             hover:text-danger hover:bg-danger-dim transition-all duration-150
-                             disabled:opacity-40"
-                  title="delete"
-                >
-                  {isDeleting ? (
-                    <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10" strokeOpacity="0.3" />
-                      <path d="M12 2a10 10 0 0 1 10 10" />
-                    </svg>
-                  ) : (
-                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                      <path d="M18 6 6 18M6 6l12 12" />
-                    </svg>
-                  )}
-                </button>
+                {/* Delete button / inline confirm — visible on group hover */}
+                {confirmDeleteId === conv.id ? (
+                  <div className="absolute right-1 flex items-center gap-1">
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(conv.id); }}
+                      className="h-5 px-1.5 rounded text-[10px] font-medium text-white transition-all duration-150"
+                      style={{ background: "var(--color-danger)" }}
+                    >
+                      del
+                    </button>
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmDeleteId(null); }}
+                      className="h-5 px-1.5 rounded text-[10px] font-medium text-text-dim hover:text-text bg-surface-2 transition-all duration-150"
+                    >
+                      no
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={(e) => handleDeleteClick(e, conv.id)}
+                    disabled={isDeleting}
+                    aria-label="delete conversation"
+                    className="absolute right-1 hidden group-hover:flex h-6 w-6 shrink-0
+                               items-center justify-center rounded text-text-muted
+                               hover:text-danger hover:bg-danger-dim transition-all duration-150
+                               disabled:opacity-40"
+                    title="delete"
+                  >
+                    {isDeleting ? (
+                      <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" strokeOpacity="0.3" />
+                        <path d="M12 2a10 10 0 0 1 10 10" />
+                      </svg>
+                    ) : (
+                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <path d="M18 6 6 18M6 6l12 12" />
+                      </svg>
+                    )}
+                  </button>
+                )}
               </div>
             );
           })
