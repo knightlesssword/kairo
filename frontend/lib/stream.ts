@@ -13,6 +13,8 @@ export interface AnimeCard {
   genres: string[];
   episodes: number | null;
   average_score: number | null;
+  cover_image?: string;
+  year?: number;
 }
 
 export interface DeltaEvent {

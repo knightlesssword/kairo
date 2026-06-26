@@ -16,7 +16,6 @@ export default function MessageInput({ onSend, disabled = false }: Props) {
     if (!trimmed || disabled) return;
     onSend(trimmed);
     setValue("");
-    // reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
@@ -37,8 +36,8 @@ export default function MessageInput({ onSend, disabled = false }: Props) {
   }
 
   return (
-    <div className="border-t border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="mx-auto flex max-w-3xl items-end gap-2">
+    <div className="border-t border-border bg-surface px-4 py-4 shrink-0">
+      <div className="mx-auto flex max-w-3xl items-end gap-3">
         <textarea
           ref={textareaRef}
           value={value}
@@ -48,12 +47,42 @@ export default function MessageInput({ onSend, disabled = false }: Props) {
           placeholder={disabled ? "waiting…" : "message kairo… (enter to send, shift+enter for newline)"}
           disabled={disabled}
           rows={1}
-          className="flex-1 resize-none overflow-hidden rounded-xl border border-zinc-300 bg-zinc-50 px-4 py-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-400 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          className="flex-1 resize-none overflow-hidden rounded-xl border bg-surface-2
+                     px-4 py-3 text-sm text-text placeholder:text-text-muted
+                     disabled:opacity-40 transition-all duration-200"
+          style={{
+            fontFamily: "var(--font-noto), sans-serif",
+            borderColor: "var(--color-border)",
+            outline: "none",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = "var(--color-primary)";
+            e.currentTarget.style.boxShadow =
+              "0 0 0 3px rgba(139,92,246,0.2), 0 0 16px rgba(139,92,246,0.15)";
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = "var(--color-border)";
+            e.currentTarget.style.boxShadow = "none";
+          }}
         />
         <button
           onClick={submit}
           disabled={disabled || !value.trim()}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-white transition-opacity disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl
+                     text-white transition-all duration-200
+                     disabled:opacity-30"
+          style={{
+            background: "linear-gradient(135deg, #EC4899, #8B5CF6)",
+          }}
+          onMouseEnter={(e) => {
+            if (!(e.currentTarget as HTMLButtonElement).disabled) {
+              (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                "0 0 16px rgba(139,92,246,0.5)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
+          }}
           aria-label="send"
         >
           <svg

@@ -4,8 +4,8 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { createConversation, fetchMe, listConversations } from "@/lib/api";
+import KairoLogo from "@/components/kairo-logo";
 
-// redirect to most recent conversation, or create a new one if none exist.
 export default function ChatPage() {
   const router = useRouter();
 
@@ -31,7 +31,6 @@ export default function ChatPage() {
           router.replace(`/chat/${conv.id}`);
         }
       } catch {
-        // if something fails, create a fresh conversation
         try {
           const conv = await createConversation();
           if (active) router.replace(`/chat/${conv.id}`);
@@ -51,8 +50,21 @@ export default function ChatPage() {
   }, [router]);
 
   return (
-    <div className="flex h-screen items-center justify-center text-zinc-500 text-sm">
-      loading…
+    <div className="flex h-screen items-center justify-center bg-void">
+      <div
+        className="flex flex-col items-center gap-4"
+        style={{ animation: "fade-in 400ms ease both" }}
+      >
+        <div style={{ animation: "spin-slow 8s linear infinite" }}>
+          <KairoLogo size={56} />
+        </div>
+        <span
+          className="text-xs tracking-[0.3em] text-text-dim uppercase"
+          style={{ fontFamily: "var(--font-cinzel), serif" }}
+        >
+          loading
+        </span>
+      </div>
     </div>
   );
 }

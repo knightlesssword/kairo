@@ -53,7 +53,7 @@ export default function SyncStatus({ me, onSyncComplete }: Props) {
             setErrorMsg(job.error ?? "sync failed");
           }
         } catch {
-          // transient poll error; keep polling
+          // transient poll error — keep polling
         }
       }, 3000);
     },
@@ -68,7 +68,6 @@ export default function SyncStatus({ me, onSyncComplete }: Props) {
       if (!activeRef.current) return;
 
       if (job.status === "completed") {
-        // deduplicated job that already finished
         setSyncState("done");
         const updated = await fetchMe();
         if (updated && activeRef.current) {
@@ -89,7 +88,6 @@ export default function SyncStatus({ me, onSyncComplete }: Props) {
     }
   }, [onSyncComplete, pollJob]);
 
-  // auto-trigger on first load if never synced
   useEffect(() => {
     activeRef.current = true;
     if (!me.last_synced_at) {
@@ -104,28 +102,70 @@ export default function SyncStatus({ me, onSyncComplete }: Props) {
   }, []);
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-zinc-800">
-      {syncState === "syncing" ? (
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
-          syncing your anime list…
-        </span>
-      ) : syncState === "error" ? (
-        <span className="text-red-500">{errorMsg}</span>
-      ) : lastSyncedAt ? (
-        <span>synced {relativeTime(lastSyncedAt)}</span>
-      ) : (
-        <span>not yet synced</span>
+    <div className="shrink-0 border-b border-border bg-surface">
+      {/* Shimmer progress bar during sync */}
+      {syncState === "syncing" && (
+        <div className="relative h-0.5 w-full overflow-hidden" style={{ background: "var(--color-surface-2)" }}>
+          <div className="absolute inset-0 shimmer-bg" />
+        </div>
       )}
 
-      {syncState !== "syncing" && (
-        <button
-          onClick={startSync}
-          className="ml-auto text-xs underline underline-offset-2 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
-        >
-          sync now
-        </button>
-      )}
+      <div className="flex items-center gap-3 px-4 py-2 text-xs">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {syncState === "syncing" ? (
+            <>
+              <span
+                className="h-1.5 w-1.5 rounded-full shrink-0"
+                style={{ background: "var(--color-cyan)", animation: "glow-pulse 2s ease-in-out infinite" }}
+              />
+              <span style={{ color: "var(--color-cyan)", fontFamily: "var(--font-noto), sans-serif" }}>
+                syncing your anime list…
+              </span>
+            </>
+          ) : syncState === "error" ? (
+            <>
+              <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: "var(--color-danger)" }} />
+              <span className="truncate" style={{ color: "var(--color-danger)", fontFamily: "var(--font-noto), sans-serif" }}>
+                {errorMsg}
+              </span>
+            </>
+          ) : syncState === "done" ? (
+            <>
+              <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: "var(--color-gold)" }} />
+              <span style={{ color: "var(--color-gold)", fontFamily: "var(--font-noto), sans-serif" }}>
+                synced just now
+              </span>
+            </>
+          ) : lastSyncedAt ? (
+            <span style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-noto), sans-serif" }}>
+              synced {relativeTime(lastSyncedAt)}
+            </span>
+          ) : (
+            <span style={{ color: "var(--color-text-muted)", fontFamily: "var(--font-noto), sans-serif" }}>
+              not yet synced
+            </span>
+          )}
+        </div>
+
+        {syncState !== "syncing" && (
+          <button
+            onClick={startSync}
+            className="transition-colors duration-150 shrink-0"
+            style={{
+              color: "var(--color-text-muted)",
+              fontFamily: "var(--font-noto), sans-serif",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.color = "var(--color-primary)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.color = "var(--color-text-muted)";
+            }}
+          >
+            sync now
+          </button>
+        )}
+      </div>
     </div>
   );
 }

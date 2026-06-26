@@ -8,7 +8,9 @@ import { readSSEStream, type AnimeCard } from "@/lib/stream";
 import MessageList, { type ChatMessage } from "@/components/chat/message-list";
 import MessageInput from "@/components/chat/message-input";
 import ReconnectBanner from "@/components/reconnect-banner";
+import SyncStatus from "@/components/sync-status";
 import ConversationList from "@/components/sidebar/conversation-list";
+import KairoLogo from "@/components/kairo-logo";
 
 export default function ConversationPage() {
   const router = useRouter();
@@ -21,7 +23,6 @@ export default function ConversationPage() {
   const [loading, setLoading] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
 
-  // auth check + load history
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -44,9 +45,7 @@ export default function ConversationPage() {
         setLoading(false);
       })
       .catch(() => {
-        if (active) {
-          router.replace("/chat");
-        }
+        if (active) router.replace("/chat");
       });
 
     return () => {
@@ -58,7 +57,6 @@ export default function ConversationPage() {
     async (content: string) => {
       if (streaming) return;
 
-      // optimistically add user message
       const userMsgId = `local-user-${Date.now()}`;
       const assistantMsgId = `local-assistant-${Date.now()}`;
 
@@ -81,9 +79,7 @@ export default function ConversationPage() {
             onDelta: (delta) => {
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === assistantMsgId
-                    ? { ...m, content: m.content + delta }
-                    : m
+                  m.id === assistantMsgId ? { ...m, content: m.content + delta } : m
                 )
               );
             },
@@ -133,7 +129,6 @@ export default function ConversationPage() {
     [conversationId, streaming]
   );
 
-  // cleanup on unmount
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
@@ -142,18 +137,37 @@ export default function ConversationPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center text-zinc-500 text-sm">
-        loading…
+      <div className="flex h-screen items-center justify-center bg-void">
+        <div
+          className="flex flex-col items-center gap-4"
+          style={{ animation: "fade-in 400ms ease both" }}
+        >
+          <div style={{ animation: "spin-slow 8s linear infinite" }}>
+            <KairoLogo size={56} />
+          </div>
+          <span
+            className="text-xs tracking-[0.3em] text-text-dim uppercase"
+            style={{ fontFamily: "var(--font-cinzel), serif" }}
+          >
+            loading
+          </span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-screen flex-col bg-void">
       {me && !me.anilist_connected && <ReconnectBanner />}
       <div className="flex flex-1 overflow-hidden">
-        <ConversationList />
+        <ConversationList me={me} />
         <div className="flex flex-1 flex-col overflow-hidden">
+          {me && (
+            <SyncStatus
+              me={me}
+              onSyncComplete={(updated) => setMe(updated)}
+            />
+          )}
           <MessageList messages={messages} />
           <MessageInput onSend={handleSend} disabled={streaming} />
         </div>
