@@ -15,10 +15,11 @@ import {
 
 interface Props {
   me?: Me | null;
+  isOpen?: boolean;
   onNewConversation?: (conv: Conversation) => void;
 }
 
-export default function ConversationList({ me, onNewConversation }: Props) {
+export default function ConversationList({ me, isOpen = true, onNewConversation }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const [items, setItems] = useState<Conversation[]>([]);
@@ -26,11 +27,12 @@ export default function ConversationList({ me, onNewConversation }: Props) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
+  // re-fetch on pathname changes so backend-set titles appear after first message
   useEffect(() => {
     listConversations()
       .then((r) => setItems(r.items))
       .catch(() => {});
-  }, []);
+  }, [pathname]);
 
   async function handleNew() {
     if (creating) return;
@@ -50,14 +52,17 @@ export default function ConversationList({ me, onNewConversation }: Props) {
     e.stopPropagation();
     if (deletingId) return;
     setDeletingId(convId);
+
+    // capture remaining BEFORE the state update to avoid stale closure in the redirect branch
+    const remainingAfterDelete = items.filter((c) => c.id !== convId);
+
     try {
       await deleteConversation(convId);
-      setItems((prev) => prev.filter((c) => c.id !== convId));
-      // if we deleted the active conversation, redirect
+      setItems(remainingAfterDelete);
+
       if (pathname === `/chat/${convId}`) {
-        const remaining = items.filter((c) => c.id !== convId);
-        if (remaining.length > 0) {
-          router.replace(`/chat/${remaining[0].id}`);
+        if (remainingAfterDelete.length > 0) {
+          router.replace(`/chat/${remainingAfterDelete[0].id}`);
         } else {
           const fresh = await createConversation();
           setItems([fresh]);
@@ -65,7 +70,11 @@ export default function ConversationList({ me, onNewConversation }: Props) {
         }
       }
     } catch {
-      // silently keep item on failure
+      // restore on failure
+      setItems((prev) => {
+        const already = prev.find((c) => c.id === convId);
+        return already ? prev : items;
+      });
     } finally {
       setDeletingId(null);
     }
@@ -82,7 +91,10 @@ export default function ConversationList({ me, onNewConversation }: Props) {
   }
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-surface">
+    <aside
+      className="flex shrink-0 flex-col border-r border-border bg-surface overflow-hidden transition-all duration-300"
+      style={{ width: isOpen ? "256px" : "0px", opacity: isOpen ? 1 : 0 }}
+    >
 
       {/* Profile header */}
       {me && (

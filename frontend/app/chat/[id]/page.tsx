@@ -3,14 +3,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 
-import { fetchMe, getConversation, sendMessage, type Me, type Message } from "@/lib/api";
+import { createConversation, fetchMe, getConversation, sendMessage, type Me, type Message } from "@/lib/api";
 import { readSSEStream, type AnimeCard } from "@/lib/stream";
 import MessageList, { type ChatMessage } from "@/components/chat/message-list";
 import MessageInput from "@/components/chat/message-input";
 import ReconnectBanner from "@/components/reconnect-banner";
 import SyncStatus from "@/components/sync-status";
 import ConversationList from "@/components/sidebar/conversation-list";
+import ChatTopbar from "@/components/chat/chat-topbar";
 import KairoLogo from "@/components/kairo-logo";
+
+const SIDEBAR_KEY = "kairo:sidebar-open";
+
+function readSidebarPref(): boolean {
+  try {
+    const v = localStorage.getItem(SIDEBAR_KEY);
+    return v === null ? true : v === "true";
+  } catch {
+    return true;
+  }
+}
 
 export default function ConversationPage() {
   const router = useRouter();
@@ -18,14 +30,47 @@ export default function ConversationPage() {
   const conversationId = params.id as string;
 
   const [me, setMe] = useState<Me | null>(null);
+  const [convTitle, setConvTitle] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [creating, setCreating] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  // read sidebar pref from localStorage after mount (avoids SSR mismatch)
+  useEffect(() => {
+    setSidebarOpen(readSidebarPref());
+  }, []);
+
+  // Ctrl+B / Cmd+B keyboard shortcut to toggle sidebar
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "b") {
+        e.preventDefault();
+        setSidebarOpen((prev) => {
+          const next = !prev;
+          try { localStorage.setItem(SIDEBAR_KEY, String(next)); } catch {}
+          return next;
+        });
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  function toggleSidebar() {
+    setSidebarOpen((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(SIDEBAR_KEY, String(next)); } catch {}
+      return next;
+    });
+  }
 
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setConvTitle(null);
 
     Promise.all([fetchMe(), getConversation(conversationId)])
       .then(([user, conv]) => {
@@ -35,6 +80,7 @@ export default function ConversationPage() {
           return;
         }
         setMe(user);
+        setConvTitle(conv.title);
         setMessages(
           conv.messages.map((m: Message) => ({
             id: m.id,
@@ -52,6 +98,17 @@ export default function ConversationPage() {
       active = false;
     };
   }, [conversationId, router]);
+
+  const handleNewConversation = useCallback(async () => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const conv = await createConversation();
+      router.push(`/chat/${conv.id}`);
+    } finally {
+      setCreating(false);
+    }
+  }, [creating, router]);
 
   const handleSend = useCallback(
     async (content: string) => {
@@ -160,8 +217,15 @@ export default function ConversationPage() {
     <div className="flex h-screen flex-col bg-void">
       {me && !me.anilist_connected && <ReconnectBanner />}
       <div className="flex flex-1 overflow-hidden">
-        <ConversationList me={me} />
+        <ConversationList me={me} isOpen={sidebarOpen} />
         <div className="flex flex-1 flex-col overflow-hidden">
+          <ChatTopbar
+            title={convTitle}
+            sidebarOpen={sidebarOpen}
+            onToggleSidebar={toggleSidebar}
+            onNewConversation={handleNewConversation}
+            creating={creating}
+          />
           {me && (
             <SyncStatus
               me={me}

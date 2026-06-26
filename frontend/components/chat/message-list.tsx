@@ -110,12 +110,18 @@ export default function MessageList({ messages }: Props) {
                 <div className="kairo-prose text-sm">
                   {msg.content ? (
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {msg.content}
+                      {msg.streaming ? msg.content + "​" : msg.content}
                     </ReactMarkdown>
                   ) : msg.streaming ? (
                     <StreamCursor />
                   ) : null}
-                  {msg.streaming && msg.content && <StreamCursor />}
+                  {/* cursor rendered below prose only while streaming with content —
+                      inline placement inside markdown block elements isn't reliable */}
+                  {msg.streaming && msg.content && (
+                    <div className="mt-1">
+                      <StreamCursor />
+                    </div>
+                  )}
                 </div>
                 {msg.animeCards?.map((anime) => (
                   <AnimeCardComponent key={anime.id} anime={anime} />
