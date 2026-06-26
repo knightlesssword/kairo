@@ -245,6 +245,11 @@ async def fetch_viewer_stats(token: str) -> AnilistStats:
 # chat-service lookups (bounded: <=1 query each, called at most once per message)
 # ---------------------------------------------------------------------------
 
+class _CoverImage(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    large: str | None = None
+
+
 class AnimeSearchResult(BaseModel):
     """metadata for one anime from a title search or season query."""
     model_config = ConfigDict(extra="ignore")
@@ -258,6 +263,7 @@ class AnimeSearchResult(BaseModel):
     format: str | None = None
     season: str | None = None
     seasonYear: int | None = None
+    coverImage: _CoverImage | None = None
 
     @property
     def display_title(self) -> str:
@@ -277,10 +283,12 @@ class AnimeSearchResult(BaseModel):
             "format": self.format,
             "season": self.season,
             "season_year": self.seasonYear,
+            "cover_image": self.coverImage.large if self.coverImage else None,
+            "year": self.seasonYear,
         }
 
 
-_MEDIA_FIELDS = "id title { romaji english } genres episodes averageScore status description(asHtml: false) format season seasonYear"
+_MEDIA_FIELDS = "id title { romaji english } genres episodes averageScore status description(asHtml: false) format season seasonYear coverImage { large }"
 
 _SEASON_QUERY = """
 query ($season: MediaSeason, $seasonYear: Int) {
