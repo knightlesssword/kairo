@@ -2,7 +2,25 @@
 // all requests send the session cookie (credentials: "include"); the backend is a
 // different origin (port) but the same site, so the samesite=lax session cookie flows.
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+// exported so error UI can name the backend it failed to reach.
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+// HTTP failures carry their status so pages can tell "logged out" (401) apart
+// from "backend broken/unreachable" (anything else, incl. network TypeErrors
+// which never become ApiError). messages keep the old "{route} failed: {n}"
+// shape so existing catch sites reading e.message are unaffected.
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+export function isUnauthorized(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 401;
+}
 
 export interface Me {
   id: string;
@@ -21,7 +39,7 @@ export function anilistLoginUrl(): string {
 export async function fetchMe(): Promise<Me | null> {
   const res = await fetch(`${API_BASE}/auth/me`, { credentials: "include" });
   if (res.status === 401) return null;
-  if (!res.ok) throw new Error(`/auth/me failed: ${res.status}`);
+  if (!res.ok) throw new ApiError(`/auth/me failed: ${res.status}`, res.status);
   return (await res.json()) as Me;
 }
 
@@ -42,7 +60,7 @@ export async function postSync(): Promise<SyncJob> {
     method: "POST",
     credentials: "include",
   });
-  if (!res.ok) throw new Error(`/profile/sync failed: ${res.status}`);
+  if (!res.ok) throw new ApiError(`/profile/sync failed: ${res.status}`, res.status);
   return (await res.json()) as SyncJob;
 }
 
@@ -50,7 +68,7 @@ export async function getSyncJob(jobId: string): Promise<SyncJob> {
   const res = await fetch(`${API_BASE}/profile/sync/${jobId}`, {
     credentials: "include",
   });
-  if (!res.ok) throw new Error(`/profile/sync/${jobId} failed: ${res.status}`);
+  if (!res.ok) throw new ApiError(`/profile/sync/${jobId} failed: ${res.status}`, res.status);
   return (await res.json()) as SyncJob;
 }
 
@@ -86,7 +104,7 @@ export async function createConversation(): Promise<Conversation> {
     method: "POST",
     credentials: "include",
   });
-  if (!res.ok) throw new Error(`/conversations POST failed: ${res.status}`);
+  if (!res.ok) throw new ApiError(`/conversations POST failed: ${res.status}`, res.status);
   return (await res.json()) as Conversation;
 }
 
@@ -95,7 +113,7 @@ export async function listConversations(cursor?: string): Promise<ConversationLi
     ? `${API_BASE}/conversations?cursor=${encodeURIComponent(cursor)}`
     : `${API_BASE}/conversations`;
   const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) throw new Error(`/conversations GET failed: ${res.status}`);
+  if (!res.ok) throw new ApiError(`/conversations GET failed: ${res.status}`, res.status);
   return (await res.json()) as ConversationList;
 }
 
@@ -103,7 +121,7 @@ export async function getConversation(id: string): Promise<ConversationDetail> {
   const res = await fetch(`${API_BASE}/conversations/${id}`, {
     credentials: "include",
   });
-  if (!res.ok) throw new Error(`/conversations/${id} failed: ${res.status}`);
+  if (!res.ok) throw new ApiError(`/conversations/${id} failed: ${res.status}`, res.status);
   return (await res.json()) as ConversationDetail;
 }
 
@@ -114,7 +132,7 @@ export async function deleteConversation(id: string): Promise<void> {
   });
   // throw on non-2xx so callers never treat a failed delete as success
   // (backend answers 204 on success, 403/404 on wrong user or missing id).
-  if (!res.ok) throw new Error(`/conversations/${id} DELETE failed: ${res.status}`);
+  if (!res.ok) throw new ApiError(`/conversations/${id} DELETE failed: ${res.status}`, res.status);
 }
 
 // returns the fetch Response so callers can read the SSE body as a stream.
