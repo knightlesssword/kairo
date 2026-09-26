@@ -117,12 +117,18 @@ export async function deleteConversation(id: string): Promise<void> {
   if (!res.ok) throw new Error(`/conversations/${id} DELETE failed: ${res.status}`);
 }
 
-// returns the fetch Response so callers can read the SSE body as a stream
-export function sendMessage(conversationId: string, content: string): Promise<Response> {
+// returns the fetch Response so callers can read the SSE body as a stream.
+// pass an AbortSignal to genuinely cancel the request (stop button, unmount).
+export function sendMessage(
+  conversationId: string,
+  content: string,
+  signal?: AbortSignal,
+): Promise<Response> {
   return fetch(`${API_BASE}/conversations/${conversationId}/messages`, {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content }),
+    signal,
   });
 }

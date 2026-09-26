@@ -4,10 +4,11 @@ import { useRef, useState, type KeyboardEvent } from "react";
 
 interface Props {
   onSend: (content: string) => void;
+  onStop?: () => void;
   disabled?: boolean;
 }
 
-export default function MessageInput({ onSend, disabled = false }: Props) {
+export default function MessageInput({ onSend, onStop, disabled = false }: Props) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -65,6 +66,27 @@ export default function MessageInput({ onSend, disabled = false }: Props) {
             e.currentTarget.style.boxShadow = "none";
           }}
         />
+        {disabled && onStop ? (
+          <button
+            onClick={onStop}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl
+                       text-white transition-all duration-200"
+            style={{
+              background: "linear-gradient(135deg, #EC4899, #8B5CF6)",
+            }}
+            aria-label="stop"
+            title="stop generating"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="h-4 w-4"
+            >
+              <rect x="6" y="6" width="12" height="12" rx="2" />
+            </svg>
+          </button>
+        ) : (
         <button
           onClick={submit}
           disabled={disabled || !value.trim()}
@@ -94,6 +116,7 @@ export default function MessageInput({ onSend, disabled = false }: Props) {
             <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
           </svg>
         </button>
+        )}
       </div>
     </div>
   );

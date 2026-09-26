@@ -66,6 +66,13 @@ export async function readSSEStream(
   const decoder = new TextDecoder();
   let buffer = "";
 
+  // aborting must unblock a pending reader.read(): the flag check below only
+  // runs between reads, so also cancel the reader (pending read resolves done).
+  const onAbort = () => {
+    reader.cancel().catch(() => {});
+  };
+  signal?.addEventListener("abort", onAbort, { once: true });
+
   try {
     while (true) {
       if (signal?.aborted) break;
@@ -110,6 +117,7 @@ export async function readSSEStream(
       }
     }
   } finally {
+    signal?.removeEventListener("abort", onAbort);
     reader.releaseLock();
   }
 }
