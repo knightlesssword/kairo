@@ -190,8 +190,9 @@ kairo/
 │   └── .env.example
 │
 ├── docker-compose.yml
-├── plan.md
-├── todo.md
+├── docs/
+│   ├── plan.md
+│   └── todo.md
 └── README.md
 ```
 
