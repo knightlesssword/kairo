@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kairo frontend
 
-## Getting Started
+Next.js 16.2.9 + React 19 + TypeScript 5 + Tailwind v4 chat UI for Kairo: AniList
+login, conversation sidebar, streaming markdown chat with anime cards, sync status.
 
-First, run the development server:
+Backend pairing: this app is a dumb client of `http://localhost:8000` by default
+(see root `README.md`). Without the backend running, `/chat` shows a
+"cannot reach the kairo backend" error with retry instead of bouncing to login.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Routes
+
+- `/` → redirects to `/chat`
+- `/login` — landing + "Connect AniList" (full navigation to the backend, which 302s to AniList)
+- `/chat` — auth guard: 401 → `/login`, backend-down → error UI; else redirects to first conversation or creates one
+- `/chat/[id]` — sidebar + topbar + sync status + message list + input
+
+## Structure
+
+- `lib/api.ts` — typed fetch client (`credentials: "include"`); `ApiError` carries HTTP status so pages split 401 from backend-down
+- `lib/stream.ts` — SSE reader (`delta | anime_card | done | error`), abort-aware
+- `components/chat/` — `message-list`, `message-input` (stop button while streaming), `chat-topbar`, `anime-card` (plain `<img>`, no `next/image`)
+- `components/sidebar/conversation-list.tsx`, `components/sync-status.tsx`, `components/reconnect-banner.tsx`
+
+## Setup
+
+```sh
+npm install
+npm run dev      # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Only env var: `NEXT_PUBLIC_API_BASE_URL` (default `http://localhost:8000`).
+It is **build-time**: changing it needs `npm run build` again (or restart `dev`).
+It must agree with the backend's `FRONTEND_ORIGIN`, or session cookies/CORS break.
+There is intentionally no frontend service in `docker-compose.yml` — run it locally.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Verify
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```sh
+npm run lint     # eslint
+npx tsc --noEmit # typecheck
+npm run build    # production build
+```
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Note: `eslint` currently reports 2 pre-existing `set-state-in-effect` errors in
+`app/chat/[id]/page.tsx` (also on `master`); do not add new ones.
