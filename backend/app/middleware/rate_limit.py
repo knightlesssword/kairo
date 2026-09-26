@@ -2,7 +2,8 @@
 
 v1 is SINGLE-WORKER only: buckets live in this process's memory. running more than one
 uvicorn worker gives each worker its own buckets and silently multiplies the effective
-limit. production deployment pins one worker (see README + docker prod config). a
+limit. both Dockerfiles pin --workers 1 (dev relies on it implicitly no longer; prod
+overrides the command but keeps the pin). a
 distributed limiter (redis or equivalent) is deferred to v2. this matches plan.md's
 "operational simplicity over horizontal scaling" decision for the MVP.
 
@@ -15,9 +16,10 @@ applied as FastAPI dependencies on the relevant routes, not as ASGI middleware: 
 per-user limits need the authenticated user, which get_current_user already resolves
 and FastAPI caches within a single request, so there's no duplicate session lookup.
 
-note (accepted v1 debt): bucket dicts are never evicted, so memory grows with the count
-of distinct ips/users seen since boot. bounded in practice for a self-host MVP; revisit
-with the v2 distributed limiter.
+note (accepted v1 debt, partially addressed): buckets idle for a full window are
+evicted by a sweep that runs at most once per window (see _evict_idle), so memory
+is bounded by the distinct ips/users active within the last minute. the remaining
+debt is distribution, not growth: revisit with the v2 distributed limiter.
 """
 
 from __future__ import annotations
@@ -50,9 +52,24 @@ class TokenBucketLimiter:
 
     def __init__(self) -> None:
         self._buckets: dict[str, _Bucket] = {}
+        self._last_sweep: float = 0.0
+
+    def _evict_idle(self, now: float) -> None:
+        """drop buckets untouched for a full window (at most one sweep per window).
+
+        behavior-neutral: a bucket idle >= _WINDOW_SECONDS refills to capacity on
+        its next touch anyway (refill caps at capacity), so recreating it then is
+        identical to keeping it. this bounds memory to keys seen in the last minute.
+        """
+        if now - self._last_sweep < _WINDOW_SECONDS:
+            return
+        self._last_sweep = now
+        for key in [k for k, b in self._buckets.items() if now - b.last_refill >= _WINDOW_SECONDS]:
+            del self._buckets[key]
 
     def check(self, key: str, capacity: int) -> None:
         now = time.monotonic()
+        self._evict_idle(now)
         refill_per_sec = capacity / _WINDOW_SECONDS
 
         bucket = self._buckets.get(key)
