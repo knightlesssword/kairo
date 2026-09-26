@@ -108,10 +108,13 @@ export async function getConversation(id: string): Promise<ConversationDetail> {
 }
 
 export async function deleteConversation(id: string): Promise<void> {
-  await fetch(`${API_BASE}/conversations/${id}`, {
+  const res = await fetch(`${API_BASE}/conversations/${id}`, {
     method: "DELETE",
     credentials: "include",
   });
+  // throw on non-2xx so callers never treat a failed delete as success
+  // (backend answers 204 on success, 403/404 on wrong user or missing id).
+  if (!res.ok) throw new Error(`/conversations/${id} DELETE failed: ${res.status}`);
 }
 
 // returns the fetch Response so callers can read the SSE body as a stream
