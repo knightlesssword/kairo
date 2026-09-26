@@ -77,11 +77,15 @@ export default function ConversationList({ me, isOpen = true, onNewConversation 
         }
       }
     } catch {
-      // restore on failure
-      setItems((prev) => {
-        const already = prev.find((c) => c.id === convId);
-        return already ? prev : items;
-      });
+      // delete failed server-side (api throws on !ok). refetch the canonical
+      // list instead of restoring a render-scope snapshot, which may be stale
+      // if a background re-fetch landed mid-delete.
+      try {
+        const r = await listConversations();
+        setItems(r.items);
+      } catch {
+        // keep the current list; the item stays visible for a retry.
+      }
     } finally {
       setDeletingId(null);
     }
