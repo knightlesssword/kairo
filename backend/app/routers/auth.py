@@ -25,7 +25,6 @@ from app.cookies import (
     set_state_cookie,
 )
 from app.database import get_session
-from app.database import get_session
 from app.dependencies import get_current_user
 from app.models.db.profile import AnilistProfile
 from app.models.db.user import User
