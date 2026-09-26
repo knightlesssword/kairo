@@ -128,7 +128,7 @@ export default function ConversationPage() {
       abortRef.current = abort;
 
       try {
-        const response = await sendMessage(conversationId, content);
+        const response = await sendMessage(conversationId, content, abort.signal);
 
         await readSSEStream(
           response,
@@ -168,16 +168,28 @@ export default function ConversationPage() {
           },
           abort.signal,
         );
-      } catch (err) {
-        if (!abort.signal.aborted) {
+
+        // stop (or unmount) resolves the reader without done/error: settle the
+        // cursor so it does not spin forever on the partial message.
+        if (abort.signal.aborted) {
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === assistantMsgId
-                ? { ...m, content: "connection error", streaming: false }
-                : m
+              m.id === assistantMsgId ? { ...m, streaming: false } : m
             )
           );
         }
+      } catch {
+        // aborted fetch rejects: settle the cursor with no error text (the
+        // user stopped it); real failures still show "connection error".
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsgId
+              ? abort.signal.aborted
+                ? { ...m, streaming: false }
+                : { ...m, content: "connection error", streaming: false }
+              : m
+          )
+        );
       } finally {
         setStreaming(false);
         abortRef.current = null;
@@ -190,6 +202,10 @@ export default function ConversationPage() {
     return () => {
       abortRef.current?.abort();
     };
+  }, []);
+
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort();
   }, []);
 
   if (loading) {
@@ -233,7 +249,7 @@ export default function ConversationPage() {
             />
           )}
           <MessageList messages={messages} />
-          <MessageInput onSend={handleSend} disabled={streaming} />
+          <MessageInput onSend={handleSend} onStop={handleStop} disabled={streaming} />
         </div>
       </div>
     </div>
