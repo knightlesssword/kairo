@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 
-import { createConversation, fetchMe, getConversation, sendMessage, type Me, type Message } from "@/lib/api";
+import { API_BASE, ApiError, createConversation, fetchMe, getConversation, isUnauthorized, sendMessage, type Me, type Message } from "@/lib/api";
 import { readSSEStream, type AnimeCard } from "@/lib/stream";
 import MessageList, { type ChatMessage } from "@/components/chat/message-list";
 import MessageInput from "@/components/chat/message-input";
@@ -34,6 +34,8 @@ export default function ConversationPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [creating, setCreating] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -72,32 +74,66 @@ export default function ConversationPage() {
     setLoading(true);
     setConvTitle(null);
 
-    Promise.all([fetchMe(), getConversation(conversationId)])
-      .then(([user, conv]) => {
+    // auth first, then conversation: only an explicit 401 means "logged out".
+    // anything else (network/5xx) is backend trouble -> error UI, not /login.
+    // a missing/forbidden conversation (403/404) still routes to /chat.
+    async function load() {
+      let user;
+      try {
+        user = await fetchMe();
+      } catch {
         if (!active) return;
-        if (!user) {
+        setLoadError(`cannot reach the kairo backend at ${API_BASE} — is it running?`);
+        setLoading(false);
+        return;
+      }
+      if (!active) return;
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
+
+      let conv;
+      try {
+        conv = await getConversation(conversationId);
+      } catch (err) {
+        if (!active) return;
+        if (isUnauthorized(err)) {
           router.replace("/login");
           return;
         }
-        setMe(user);
-        setConvTitle(conv.title);
-        setMessages(
-          conv.messages.map((m: Message) => ({
-            id: m.id,
-            role: m.role,
-            content: m.content,
-          }))
-        );
+        if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
+          router.replace("/chat");
+          return;
+        }
+        setLoadError(`cannot reach the kairo backend at ${API_BASE} — is it running?`);
         setLoading(false);
-      })
-      .catch(() => {
-        if (active) router.replace("/chat");
-      });
+        return;
+      }
+      if (!active) return;
+      setMe(user);
+      setConvTitle(conv.title);
+      setMessages(
+        conv.messages.map((m: Message) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+        }))
+      );
+      setLoading(false);
+    }
+
+    load().catch(() => {
+      if (active) {
+        setLoadError(`cannot reach the kairo backend at ${API_BASE} — is it running?`);
+        setLoading(false);
+      }
+    });
 
     return () => {
       active = false;
     };
-  }, [conversationId, router]);
+  }, [conversationId, router, retryKey]);
 
   const handleNewConversation = useCallback(async () => {
     if (creating) return;
@@ -207,6 +243,39 @@ export default function ConversationPage() {
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
   }, []);
+
+  if (loadError) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-void">
+        <div
+          className="flex flex-col items-center gap-4 text-center px-6"
+          style={{ animation: "fade-in 400ms ease both" }}
+        >
+          <KairoLogo size={56} />
+          <span
+            className="text-sm text-text-dim max-w-sm"
+            style={{ fontFamily: "var(--font-noto), sans-serif" }}
+          >
+            {loadError}
+          </span>
+          <button
+            onClick={() => {
+              setLoadError(null);
+              setRetryKey((k) => k + 1);
+            }}
+            className="mt-1 h-10 rounded-full px-6 font-medium text-white text-sm cursor-pointer
+                       transition-all duration-200"
+            style={{
+              background: "linear-gradient(135deg, #EC4899, #8B5CF6)",
+              fontFamily: "var(--font-noto), sans-serif",
+            }}
+          >
+            retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
