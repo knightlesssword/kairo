@@ -83,12 +83,19 @@ cp backend/.env.example backend/.env
 # PowerShell: Copy-Item backend/.env.example backend/.env
 ```
 
-Generate secrets and fill `.env`:
+Generate secrets and fill `.env` (commands work in Git Bash/macOS/Linux;
+CMD and PowerShell variants below):
 
 ```sh
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"  # FERNET_KEY
 python -c "import secrets; print(secrets.token_urlsafe(32))"                                 # SESSION_SECRET
-# PowerShell: use py -c with single-quote care, or Git Bash
+```
+
+```powershell
+# PowerShell (py launcher; quoting is safe here: no nested quotes inside)
+py -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+py -c "import secrets; print(secrets.token_urlsafe(32))"
+# CMD: same two lines with python instead of py
 ```
 
 Set `ANILIST_CLIENT_ID` / `ANILIST_CLIENT_SECRET` / `ANILIST_REDIRECT_URI`
@@ -128,6 +135,7 @@ docker compose exec backend alembic upgrade head   # first boot only
 
 ```sh
 cp backend/.env.example backend/.env   # then fill secrets, set ENVIRONMENT=production
+# PowerShell: Copy-Item backend/.env.example backend/.env
 docker compose -f docker-compose.prod.yml up -d --build
 curl http://localhost:8000/health
 ```
@@ -141,7 +149,10 @@ for `Secure` cookies). Frontend needs its own host: build with the prod
 ## Configuration
 
 Backend env: [`backend/.env.example`](backend/.env.example) (all keys, fail-loud
-on missing secrets). Key groups: core (`ENVIRONMENT`, `DATABASE_URL`,
+on missing secrets). Only `FERNET_KEY`, `SESSION_SECRET`, `ANILIST_CLIENT_ID`,
+`ANILIST_CLIENT_SECRET`, `DATABASE_URL`, and the LLM keys are required; every
+other key falls back to the default shown in the example when unset, so a local
+`.env` omitting them is intentional, not drift. Key groups: core (`ENVIRONMENT`, `DATABASE_URL`,
 `LOG_LEVEL`), secrets (`FERNET_KEY`, `SESSION_SECRET`), session TTL,
 AniList OAuth + API URLs, LLM (`LLM_PROVIDER`, `LLM_API_KEY`, `LLM_MODEL`,
 `LLM_EXTRACTION_MODEL`, `OLLAMA_BASE_URL`), context budgets
