@@ -12,6 +12,7 @@ Backend pairing: this app is a dumb client of `http://localhost:8000` by default
 - `/` → redirects to `/chat`
 - `/login` — landing + "Connect AniList" (full navigation to the backend, which 302s to AniList)
 - `/chat` — auth guard: 401 → `/login`, backend-down → error UI; else redirects to first conversation or creates one
+- `proxy.ts` — edge pre-check: no `kairo_session` cookie → instant server redirect to `/login` (no flash, no backend call); validation itself stays in the pages
 - `/chat/[id]` — sidebar + topbar + sync status + message list + input
 
 ## Structure
